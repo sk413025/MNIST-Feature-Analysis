@@ -1,12 +1,12 @@
 import torch
-import torch.nn as nn
 import torchvision
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
 import numpy as np
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score
-from mnist_cnn import CNN  # 導入之前定義的 CNN 模型
+import joblib
+from mnist_cnn import CNN
 
 def extract_features(model, data_loader, device):
     features = []
@@ -40,7 +40,8 @@ def main():
 
     train_dataset = torchvision.datasets.MNIST(root='./data', 
                                              train=True,
-                                             transform=transform)
+                                             transform=transform,
+                                             download=True)
     
     test_dataset = torchvision.datasets.MNIST(root='./data',
                                             train=False,
@@ -73,6 +74,10 @@ def main():
     
     print(f"Logistic Regression - Training Accuracy: {train_accuracy*100:.2f}%")
     print(f"Logistic Regression - Test Accuracy: {test_accuracy*100:.2f}%")
+
+    # 保存訓練好的 Logistic Regression 模型
+    joblib.dump(lr, 'mnist_lr.joblib')
+    print("Logistic Regression model saved successfully!")
 
 if __name__ == '__main__':
     main() 

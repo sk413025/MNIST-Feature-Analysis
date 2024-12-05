@@ -41,7 +41,7 @@ venv.bak/
 # Project specific
 data/
 *.pth
-*.png
+# *.png
 logs/
 wandb/
 
@@ -73,3 +73,5 @@ coverage.xml
 .Trashes
 ehthumbs.db
 Thumbs.db 
+
+*.joblib
