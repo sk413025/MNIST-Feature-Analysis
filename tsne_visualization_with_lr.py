@@ -41,7 +41,24 @@ def extract_features(model, data_loader, device, num_samples=3000):
     
     return np.vstack(features), np.concatenate(labels)
 
-def plot_tsne_comparison(features, lr_features, labels, lr_accuracy, perplexity=30, n_iter=1000):
+def compute_weighted_features(features, lr_model):
+    """計算基於 Logistic Regression 權重的加權特徵"""
+    # 獲取權重矩陣 (128 x 10)
+    weights = lr_model.coef_.T  # 轉置為 (128 x 10)
+    
+    # 計算每個特徵維度的重要性分數 (128,)
+    # 使用 L2 norm 來衡量每個特徵在所有類別上的重要性
+    feature_importance = np.sqrt(np.sum(weights ** 2, axis=1))
+    
+    # 將重要性分數歸一化到 [0, 1] 區間
+    feature_importance = (feature_importance - feature_importance.min()) / (feature_importance.max() - feature_importance.min())
+    
+    # 使用重要性分數來加權原始特徵
+    weighted_features = features * feature_importance.reshape(1, -1)
+    
+    return weighted_features
+
+def plot_tsne_comparison(features, weighted_features, labels, lr_accuracy, perplexity=30, n_iter=1000):
     # 設置 matplotlib 風格
     plt.style.use('default')
     plt.rcParams['axes.grid'] = True
@@ -59,7 +76,7 @@ def plot_tsne_comparison(features, lr_features, labels, lr_accuracy, perplexity=
     
     # 設置總標題
     title_text = [
-        "t-SNE Visualization of MNIST Features",
+        "t-SNE Visualization of MNIST Features (128-dimensional)",
         f"Sample Size: {len(labels)} | Perplexity: {perplexity} | Iterations: {n_iter}",
         f"Logistic Regression Accuracy: {lr_accuracy*100:.2f}%",
         f"Generated at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
@@ -91,21 +108,22 @@ def plot_tsne_comparison(features, lr_features, labels, lr_accuracy, perplexity=
         ax1.scatter(features_tsne[mask, 0], features_tsne[mask, 1],
                    c=[colors[i]], label=f'Digit {i} (n={class_info[i]})',
                    alpha=0.6, s=50)
-    ax1.set_title('Original CNN Features (128-dimensional)', pad=10, fontsize=12)
+    ax1.set_title('Original CNN Features\n(128-dimensional)', pad=10, fontsize=12)
     ax1.legend(bbox_to_anchor=(1.05, 1), loc='upper left', title='Classes')
     
-    # 對 LR 轉換後的特徵執行 t-SNE
-    print("Performing t-SNE on LR transformed features...")
-    tsne_lr = TSNE(n_components=2, perplexity=perplexity, n_iter=n_iter, random_state=42)
-    lr_features_tsne = tsne_lr.fit_transform(lr_features)
+    # 對加權特徵執行 t-SNE
+    print("Performing t-SNE on weighted features...")
+    tsne_weighted = TSNE(n_components=2, perplexity=perplexity, n_iter=n_iter, random_state=42)
+    weighted_features_tsne = tsne_weighted.fit_transform(weighted_features)
     
-    # 繪製 LR 轉換後特徵的散點圖
+    # 繪製加權特徵的散點圖
     for i in range(10):
         mask = labels == i
-        ax2.scatter(lr_features_tsne[mask, 0], lr_features_tsne[mask, 1],
+        ax2.scatter(weighted_features_tsne[mask, 0], weighted_features_tsne[mask, 1],
                    c=[colors[i]], label=f'Digit {i} (n={class_info[i]})',
                    alpha=0.6, s=50)
-    ax2.set_title('Logistic Regression Transformed Features (10-dimensional)', pad=10, fontsize=12)
+    ax2.set_title('LR-Weighted CNN Features\n(128-dimensional, weighted by feature importance)', 
+                 pad=10, fontsize=12)
     ax2.legend(bbox_to_anchor=(1.05, 1), loc='upper left', title='Classes')
     
     # 添加軸標籤和網格
@@ -154,15 +172,16 @@ def main():
     print("Extracting features...")
     features, labels = extract_features(model, test_loader, device)
     
-    # 使用已訓練好的 LR 模型轉換特徵
-    lr_features = lr.decision_function(features)
+    # 計算加權特徵
+    print("Computing weighted features...")
+    weighted_features = compute_weighted_features(features, lr)
     
     # 計算準確率
     lr_pred = lr.predict(features)
     accuracy = accuracy_score(labels, lr_pred)
     
     # 執行 t-SNE 並繪圖比較
-    plot_tsne_comparison(features, lr_features, labels, accuracy)
+    plot_tsne_comparison(features, weighted_features, labels, accuracy)
 
 if __name__ == '__main__':
     main() 
